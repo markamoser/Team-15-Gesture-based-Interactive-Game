@@ -1,0 +1,3 @@
+[submodule "HandPoseBarracuda"]
+	path = HandPoseBarracuda
+	url = https://github.com/keijiro/HandPoseBarracuda
