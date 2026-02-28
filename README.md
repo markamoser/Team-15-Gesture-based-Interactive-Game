@@ -1,95 +1,44 @@
-# Webcam Whack-a-Mole Hand Capture
-Overview
+# Hand-Tracking-Module
+### Simple hand landmarks detection and hand tracking module on python3 using openCV and mediapipe
+I'm using python 3.7.9, opencv 4.5.5.62 and mediapipe 0.8.9.1
 
-Webcam Whack-a-Mole Hand Capture is a proof-of-concept game that replaces traditional input devices (mouse, keyboard, or VR controllers) with webcam-based hand motion tracking. Players interact with the game by moving their hands in front of a webcam to control actions in a Whack-a-Mole–style environment.
+## Requirements
+* opencv
+* mediapipe
 
-The project demonstrates how hand tracking can be used as an alternative control scheme for games and other interactive applications.
+## Features
+* Tracking Hands
+* Opens Camera instantly
+* Detecting if fingers are up or down
 
-Purpose
+## Usage
+import libraries:
+```python
+import cv2 as cv
+import HandTrackingModule as hd
+```
+to use the library:
+```python
+cap = cv.VideoCapture(1)
+detector = hd.handDetector()
+while True:
+  sucess, img = cap.read()
+  img = detector.findHands(img)
+  try:
+    fingers = detector.getFingers(img)
+    print(fingers)
+  except Exception as ex:
+    Print(f'An Exception Occurred: {ex}')
+  cv.imshow('image', img)
+  k = cv.waitKey(1)
+  if k == 27:
+    break
+```
 
-The goal of this project is to:
-Serve as a Capstone Project for 4 graduating Seniors
-Capture hand movements using a webcam.
-Translate movements into game controls.
-Demonstrate 2D motion and 3D depth tracking for interactive gameplay.
-Provide a proof of concept for future applications using gesture-based input.
+## Support
+if you are having issues let me know
 
-Features
+## License
+MIT license.
 
-2D Hand Tracking
-
-Up
-Down
-Left
-Right
-
-3D Depth Tracking
-
-Hand moving toward the camera (in)
-Hand moving away from the camera (out)
-
-Whack-a-Mole Gameplay
-
-Hand motions replace mouse clicks or controller input.
-
-Demonstrates feasibility of webcam gesture control in Unity.
-
-How to Use
-Requirements
-
-Webcam
-Unity Hub & Unity Editor (recommended XXXX LTS or newer)
-.NET / C# support enabled
-
-One of the supported hand-tracking frameworks:
-
-MediaPipe?
-OpenCV?
-
-Setup
-
-Clone the repository:
-
-git clone <repository-url>
-
-Open the project in Unity Hub.
-
-Ensure your webcam is connected and recognized by your OS.
-
-Run the scene:
-
-Open MainScene (or the primary gameplay scene).
-
-Click Play in the Unity Editor.
-
-Controls - (Two hands held near each other in the center of the camera)
-Hand Motion	Action
-Move Up	Lift Hammer
-Move Down	Strike Hammer
-Move Left	Move hammer left
-Move Right	Move hammer right
-Move up	push hands in
-Move back pull hands back
-
-
-
-
-Architecture
-
-Webcam captures video feed.
-Hand tracking framework detects hand position.
-Movement vectors are translated into Unity input events.
-Game logic responds to gestures.
-
-Release Notes
-Current Submission Status - Milestone 1,2 = working hand capture, working whack-a-mole game
-
-Working Features
-
-
-
-
-
-Contributors
-
-Project Team: John Cook, Ben Laffey, Mark Moser, Hunter Nielson
+### Thank You
