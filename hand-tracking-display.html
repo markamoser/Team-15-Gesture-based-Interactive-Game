@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Tracking Template</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #080c12;
+    --surface: #0e1520;
+    --border: #1a2540;
+    --left-color: #00e5ff;
+    --right-color: #ff4081;
+    --left-glow: rgba(0, 229, 255, 0.4);
+    --right-glow: rgba(255, 64, 129, 0.4);
+    --text: #e8edf5;
+    --muted: #4a5568;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ---- Header ---- */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,12,18,0.9);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .logo span:first-child { color: var(--left-color); }
+  .logo span:last-child  { color: var(--right-color); }
+
+  #status-bar {
+    display: flex;
+    gap: 20px;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+
+  .hand-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
+  }
+  .hand-status.active-left  { border-color: var(--left-color);  background: rgba(0,229,255,0.07); box-shadow: 0 0 10px var(--left-glow); }
+  .hand-status.active-right { border-color: var(--right-color); background: rgba(255,64,129,0.07); box-shadow: 0 0 10px var(--right-glow); }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s ease;
+  }
+  .hand-status.active-left  .dot { background: var(--left-color);  box-shadow: 0 0 6px var(--left-color); }
+  .hand-status.active-right .dot { background: var(--right-color); box-shadow: 0 0 6px var(--right-color); }
+
+  #ws-status { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.7rem; transition: all 0.3s ease; }
+  #ws-status.connected    { border-color: #00ff88; background: rgba(0,255,136,0.07); }
+  #ws-status.connected    .dot { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+  #ws-status.disconnected { border-color: #ff4040; }
+  #ws-status.disconnected .dot { background: #ff4040; }
+
+  /* ---- Main Layout ---- */
+  main {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  /* ---- Camera / Canvas ---- */
+  #canvas-container {
+    position: relative;
+    flex: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #000;
+  }
+
+  #input-video {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    opacity: 0.85;
+  }
+
+  #output-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1);
+  }
+
+  /* ---- Loading Overlay ---- */
+  #loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    z-index: 10;
+    gap: 20px;
+    transition: opacity 0.5s ease;
+  }
+  #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .loader {
+    width: 48px; height: 48px;
+    border: 2px solid var(--border);
+    border-top-color: var(--left-color);
+    border-right-color: var(--right-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loading-text {
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+
+  /* ---- Side Panel ---- */
+  #side-panel {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .panel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .panel-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* FPS counter */
+  #fps-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    text-align: center;
+    color: var(--text);
+    padding: 8px 0;
+  }
+  #fps-display span { font-size: 0.7rem; color: var(--muted); display: block; letter-spacing: 0.15em; margin-top: -4px; }
+
+  /* Directional pad */
+  .dir-pad {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 4px;
+    aspect-ratio: 1;
+    margin-bottom: 8px;
+  }
+
+  .dir-btn {
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: var(--muted);
+    transition: all 0.1s ease;
+    padding: 4px;
+  }
+  .dir-btn.active-left  { background: rgba(0,229,255,0.15);  border-color: var(--left-color);  color: var(--left-color);  box-shadow: 0 0 8px var(--left-glow); }
+  .dir-btn.active-right { background: rgba(255,64,129,0.15); border-color: var(--right-color); color: var(--right-color); box-shadow: 0 0 8px var(--right-glow); }
+  .dir-btn.center { border-color: transparent; }
+
+  .depth-row { display: flex; gap: 4px; margin-top: 4px; }
+  .depth-btn {
+    flex: 1;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    text-align: center;
+    padding: 5px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    transition: all 0.1s ease;
+  }
+  .depth-btn.active-left  { background: rgba(0,229,255,0.15);  border-color: var(--left-color);  color: var(--left-color); }
+  .depth-btn.active-right { background: rgba(255,64,129,0.15); border-color: var(--right-color); color: var(--right-color); }
+
+  /* Hand label inside d-pad section */
+  .hand-label-left  { font-size: 0.6rem; color: var(--left-color);  margin-bottom: 4px; letter-spacing: 0.1em; }
+  .hand-label-right { font-size: 0.6rem; color: var(--right-color); margin-top: 10px; margin-bottom: 4px; letter-spacing: 0.1em; }
+
+  /* Event log */
+  #game-zone {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #game-zone h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  #game-output {
+    flex: 1;
+    font-size: 0.65rem;
+    line-height: 1.8;
+    color: var(--muted);
+    overflow-y: auto;
+  }
+  #game-output .event-left  { color: var(--left-color); }
+  #game-output .event-right { color: var(--right-color); }
+
+  /* ---- Footer ---- */
+  footer {
+    position: relative; z-index: 10;
+    padding: 8px 24px;
+    border-top: 1px solid var(--border);
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    display: flex;
+    justify-content: space-between;
+    background: rgba(8,12,18,0.9);
+  }
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     HEADER — hand detection status + WebSocket connection indicator
+     ================================================================ -->
+<header>
+  <div class="logo"><span>HAND</span>&nbsp;<span>TRACK</span></div>
+  <div id="status-bar">
+    <div class="hand-status" id="left-status">
+      <div class="dot"></div>
+      <span>LEFT</span>
+    </div>
+    <div class="hand-status" id="right-status">
+      <div class="dot"></div>
+      <span>RIGHT</span>
+    </div>
+    <div class="hand-status disconnected" id="ws-status">
+      <div class="dot"></div>
+      <span id="ws-label">WS</span>
+    </div>
+  </div>
+</header>
+
+<!-- ================================================================
+     MAIN — camera feed + side panel
+     ================================================================ -->
+<main>
+
+  <!-- Camera / skeleton overlay -->
+  <div id="canvas-container">
+    <video id="input-video" autoplay playsinline muted></video>
+    <canvas id="output-canvas"></canvas>
+
+    <div id="loading-overlay">
+      <div class="loader"></div>
+      <div id="loading-text">INITIALIZING CAMERA...</div>
+    </div>
+  </div>
+
+  <!-- Side panel -->
+  <div id="side-panel">
+
+    <!-- FPS -->
+    <div class="panel-card">
+      <h3>FPS</h3>
+      <div id="fps-display">--<span>FRAMES / SEC</span></div>
+    </div>
+
+    <!-- 6-axis directional control indicators -->
+    <div class="panel-card">
+      <h3>Directional Controls</h3>
+
+      <!-- Left hand -->
+      <div class="hand-label-left">LEFT HAND</div>
+      <div class="dir-pad">
+        <div class="dir-btn" id="l-nw"></div>
+        <div class="dir-btn" id="l-up">▲</div>
+        <div class="dir-btn" id="l-ne"></div>
+        <div class="dir-btn" id="l-left">◀</div>
+        <div class="dir-btn center"></div>
+        <div class="dir-btn" id="l-right">▶</div>
+        <div class="dir-btn" id="l-sw"></div>
+        <div class="dir-btn" id="l-down">▼</div>
+        <div class="dir-btn" id="l-se"></div>
+      </div>
+      <div class="depth-row">
+        <div class="depth-btn" id="l-in">IN ●</div>
+        <div class="depth-btn" id="l-out">OUT ○</div>
+      </div>
+
+      <!-- Right hand -->
+      <div class="hand-label-right">RIGHT HAND</div>
+      <div class="dir-pad">
+        <div class="dir-btn" id="r-nw"></div>
+        <div class="dir-btn" id="r-up">▲</div>
+        <div class="dir-btn" id="r-ne"></div>
+        <div class="dir-btn" id="r-left">◀</div>
+        <div class="dir-btn center"></div>
+        <div class="dir-btn" id="r-right">▶</div>
+        <div class="dir-btn" id="r-sw"></div>
+        <div class="dir-btn" id="r-down">▼</div>
+        <div class="dir-btn" id="r-se"></div>
+      </div>
+      <div class="depth-row">
+        <div class="depth-btn" id="r-in">IN ●</div>
+        <div class="depth-btn" id="r-out">OUT ○</div>
+      </div>
+    </div>
+
+    <!-- Unity event log -->
+    <div id="game-zone">
+      <h3>📡 Unity Events</h3>
+      <div id="game-output">
+        <span style="color:#2a3a50">// Events will stream here<br>// Connect relay.py to begin</span>
+      </div>
+    </div>
+
+  </div><!-- /side-panel -->
+</main>
+
+<!-- ================================================================
+     FOOTER
+     ================================================================ -->
+<footer>
+  <span>MEDIAPIPE HANDS — UNITY BRIDGE TEMPLATE</span>
+  <span id="model-info">MODEL: LOADING...</span>
+</footer>
+
+<!-- ================================================================
+     SCRIPTS
+     Load MediaPipe libraries first, then the hand tracking logic.
+     Both files must be in the same folder.
+     ================================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="hand-tracking.js"></script>
+
+</body>
+</html>
