@@ -34,11 +34,3 @@ while True:
   if k == 27:
     break
 ```
-
-## Support
-if you are having issues let me know
-
-## License
-MIT license.
-
-### Thank You
